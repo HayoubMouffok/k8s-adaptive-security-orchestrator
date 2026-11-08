@@ -1,0 +1,21 @@
+apiVersion: security.kubearmor.com/v1
+kind: KubeArmorClusterPolicy
+metadata:
+  name: auto-file-access-1756249373
+  labels:
+    generated-by: security-orchestrator
+    threat-type: file-access
+spec:
+  severity: 7
+  action: Block
+  selector:
+    matchExpressions:
+      - key: namespace
+        operator: In
+        values: [testing]
+  file:
+    matchPaths:
+      - path: /etc/shadow
+        action: Block
+      - path: /etc/passwd
+        action: Audit
