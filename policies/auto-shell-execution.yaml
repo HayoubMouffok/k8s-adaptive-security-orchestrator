@@ -1,0 +1,21 @@
+apiVersion: security.kubearmor.com/v1
+kind: KubeArmorClusterPolicy
+metadata:
+  name: auto-shell-execution-1756249373
+  labels:
+    generated-by: security-orchestrator
+    threat-type: shell-execution
+spec:
+  severity: 7
+  action: Block
+  selector:
+    matchExpressions:
+      - key: namespace
+        operator: In
+        values: [testing]
+  process:
+    matchPaths:
+      - path: /bin/bash
+        action: Block
+      - path: /bin/sh
+        action: Block
