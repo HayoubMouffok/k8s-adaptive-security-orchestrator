@@ -1,0 +1,38 @@
+# Valeurs Helm pour falcosecurity/falco
+driver:
+  kind: modern_ebpf   # pas de module noyau à compiler
+tty: true             # alertes affichées immédiatement dans les logs
+
+falcosidekick:
+  enabled: true
+  config:
+    webhook:
+      address: http://orchestrator.security-orchestrator.svc.cluster.local:8080/falco
+      minimumpriority: notice
+
+falco:
+  # Ajoute les champs Kubernetes et processus à toutes les alertes, pour que
+  # l'orchestrateur sache quel pod cibler (Falco >= 0.39).
+  append_output:
+    - match:
+        source: syscall
+      extra_fields:
+        - k8s.ns.name
+        - k8s.pod.name
+        - proc.exepath
+        - fd.name
+
+# Règle de laboratoire : 1.1.1.1 joue le rôle d'un serveur de commande et contrôle (C2).
+# (La règle officielle « Outbound Connection to C2 Servers » n'est plus activée par défaut.)
+customRules:
+  orchestrator-lab.yaml: |-
+    - rule: Outbound connection to lab C2 server
+      desc: Connexion sortante vers l'IP déclarée comme C2 dans le laboratoire
+      condition: >
+        evt.type = connect and evt.dir = < and container
+        and fd.typechar = 4 and fd.sip = "1.1.1.1"
+      output: >
+        Connexion vers un serveur C2 de test (pod=%k8s.pod.name ns=%k8s.ns.name
+        proc=%proc.name connection=%fd.name sip=%fd.sip)
+      priority: WARNING
+      tags: [network, mitre_command_and_control, T1071]
