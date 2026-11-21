@@ -36,3 +36,36 @@ customRules:
         proc=%proc.name connection=%fd.name sip=%fd.sip)
       priority: WARNING
       tags: [network, mitre_command_and_control, T1071]
+
+    - rule: Read service account token in container
+      desc: Lecture du jeton du compte de service par un processus du conteneur (vol d'identifiants)
+      condition: >
+        open_read and container
+        and fd.name contains "/secrets/kubernetes.io/serviceaccount"
+      output: >
+        Jeton du compte de service lu (pod=%k8s.pod.name ns=%k8s.ns.name proc=%proc.name file=%fd.name)
+      priority: WARNING
+      tags: [filesystem, mitre_credential_access, T1528]
+
+    - rule: Binary executed from temporary directory
+      desc: Exécution d'un binaire déposé dans /tmp, /dev/shm ou /var/tmp (outil téléchargé)
+      condition: >
+        spawned_process and container
+        and (proc.exepath startswith "/tmp/" or proc.exepath startswith "/dev/shm/"
+             or proc.exepath startswith "/var/tmp/")
+      output: >
+        Binaire exécuté depuis un répertoire temporaire (pod=%k8s.pod.name ns=%k8s.ns.name
+        proc=%proc.name exe=%proc.exepath)
+      priority: WARNING
+      tags: [process, mitre_command_and_control, T1105]
+
+    - rule: Write below binary dir in container
+      desc: Écriture dans un répertoire de binaires (altération ou persistance)
+      condition: >
+        open_write and container
+        and fd.directory in (/bin, /sbin, /usr/bin, /usr/sbin, /usr/local/bin)
+      output: >
+        Écriture dans un répertoire de binaires (pod=%k8s.pod.name ns=%k8s.ns.name proc=%proc.name
+        file=%fd.name)
+      priority: WARNING
+      tags: [filesystem, mitre_persistence, T1554]

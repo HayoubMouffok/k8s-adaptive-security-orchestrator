@@ -137,3 +137,19 @@ def test_unwatched_namespace_is_ignored():
     c, kube = make()
     a = alert("Terminal shell in container", **{"proc.name": "bash", "k8s.ns.name": "kube-system"})
     assert c.post("/falco", json=a).get_json()["action"] == "ignored" and not kube.applied
+
+
+@pytest.mark.parametrize("rule,fields,expected,kind", [
+    ("Read service account token in container",
+     {"fd.name": "/run/secrets/kubernetes.io/serviceaccount/..2026/token", "proc.name": "cat"},
+     "token_theft", "file"),
+    ("Binary executed from temporary directory", {"proc.exepath": "/tmp/scan", "proc.name": "scan"},
+     "untrusted_binary", "process"),
+    ("Write below binary dir in container", {"fd.name": "/usr/bin/backdoor", "proc.name": "touch"},
+     "binary_tampering", "file"),
+])
+def test_new_threat_types_build_directory_policies(rule, fields, expected, kind):
+    ev = classify(alert(rule, "Warning", **fields))
+    assert ev.threat_type == expected
+    pol = build_policy(ev, {"app": "web"}, block=True, ttl=0)
+    assert pol["spec"]["action"] == "Block" and pol["spec"][kind]["matchDirectories"]

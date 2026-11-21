@@ -17,11 +17,16 @@ MITRE = {
     "sensitive_file_access": ("T1003.008", "OS Credential Dumping: /etc/passwd and /etc/shadow"),
     "network_activity": ("T1071", "Application Layer Protocol"),
     "privilege_escalation": ("T1611", "Escape to Host"),
+    "token_theft": ("T1528", "Steal Application Access Token"),
+    "untrusted_binary": ("T1105", "Ingress Tool Transfer"),
+    "binary_tampering": ("T1554", "Compromise Host Software Binary"),
     "unknown": ("", "Non classé"),
 }
 
 SHELLS = {"bash", "sh", "zsh", "dash", "ash", "ksh"}
 SENSITIVE_PREFIXES = ("/etc/shadow", "/etc/sudoers", "/root/.ssh", "/etc/kubernetes")
+SA_TOKEN_DIR = "/secrets/kubernetes.io/serviceaccount"
+TMP_DIRS = ("/tmp/", "/dev/shm/", "/var/tmp/")
 
 
 @dataclass
@@ -66,6 +71,12 @@ def classify(alert: dict) -> ThreatEvent:
 
     if "privilege" in rl or "escape" in rl or "mitre_privilege_escalation" in tags:
         t = "privilege_escalation"
+    elif SA_TOKEN_DIR in fd or "service account token" in rl:
+        t = "token_theft"
+    elif exe.startswith(TMP_DIRS) or "drop and execute" in rl or "executed from temporary" in rl:
+        t = "untrusted_binary"
+    elif "binary dir" in rl:
+        t = "binary_tampering"
     elif fd.startswith(SENSITIVE_PREFIXES) or "sensitive file" in rl:
         t = "sensitive_file_access"
     elif "shell" in rl or proc in SHELLS or "mitre_execution" in tags:

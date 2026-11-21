@@ -50,7 +50,10 @@ def evaluate(scenarios: list[dict], events: list[dict]) -> dict:
 
     malicious = [r for r in rows if r["label"] == "malicious"]
     blocked = [r for r in malicious if r["replay_blocked"] is True]
+    benign_checked = [r for r in rows if r["label"] == "benign" and r["replay_blocked"] is not None]
+    preserved = [r for r in benign_checked if r["replay_blocked"] is False]
     return {
+        "legit_preserved_rate": len(preserved) / len(benign_checked) if benign_checked else None,
         "rows": rows,
         "detection_rate": tp / (tp + fn) if tp + fn else 0.0,
         "false_positive_rate": fp / (fp + tn) if fp + tn else 0.0,
@@ -62,7 +65,7 @@ def evaluate(scenarios: list[dict], events: list[dict]) -> dict:
 
 def report(r: dict) -> str:
     lines = ["# Résultats de l'évaluation", "",
-             "| Scénario | Nature | Type attendu | Détecté | Rejeu bloqué |",
+             "| Scénario | Nature | Type attendu | Détecté | 2e essai bloqué |",
              "|---|---|---|---|---|"]
     for x in r["rows"]:
         rb = {True: "oui", False: "non", None: "-"}[x["replay_blocked"]]
@@ -73,6 +76,7 @@ def report(r: dict) -> str:
               f"- Taux de détection : **{pct(r['detection_rate'])}**",
               f"- Taux de faux positifs : **{pct(r['false_positive_rate'])}**",
               f"- Attaques bloquées au rejeu : **{pct(r['block_rate'])}**",
+              f"- Actions légitimes toujours permises : **{pct(r['legit_preserved_rate'] or 0)}**",
               f"- Latence détection -> politique appliquée : médiane **{lat(r['latency_median_s'])}**, "
               f"max {lat(r['latency_max_s'])}"]
     return "\n".join(lines)

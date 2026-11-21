@@ -61,6 +61,30 @@ if run -- curl -s -m 5 -o /dev/null http://web.demo.svc.cluster.local; then R=fa
 log B2 benign none "$T" "$R"
 echo "   trafic légitime toujours autorisé : $([ "$R" = false ] && echo oui || echo NON)"
 
+echo "== M4 (T1528) : vol du jeton du compte de service"
+T=$(now); run -- cat /var/run/secrets/kubernetes.io/serviceaccount/token; sleep 8
+if run -- cat /var/run/secrets/kubernetes.io/serviceaccount/token; then R=false; else R=true; fi
+log M4 malicious token_theft "$T" "$R"
+echo "   rejeu bloqué : $R"
+
+echo "== B3 (légitime) : écriture d'un fichier temporaire par l'application"
+T=$(now); run -- sh -c 'echo cache > /tmp/app-cache && cat /tmp/app-cache'; sleep 5
+if run -- sh -c 'echo cache > /tmp/app-cache'; then R=false; else R=true; fi
+log B3 benign none "$T" "$R"
+echo "   action légitime toujours autorisée : $([ "$R" = false ] && echo oui || echo NON)"
+
+echo "== M5 (T1105) : exécution d'un outil déposé dans /tmp"
+T=$(now); run -- sh -c 'cp /usr/bin/id /tmp/scan && /tmp/scan'; sleep 8
+if run -- sh -c 'cp /usr/bin/id /tmp/scan2 && /tmp/scan2'; then R=false; else R=true; fi
+log M5 malicious untrusted_binary "$T" "$R"
+echo "   rejeu bloqué : $R"
+
+echo "== M6 (T1554) : altération d'un répertoire de binaires"
+T=$(now); run -- touch /usr/bin/backdoor; sleep 8
+if run -- touch /usr/bin/backdoor2; then R=false; else R=true; fi
+log M6 malicious binary_tampering "$T" "$R"
+echo "   rejeu bloqué : $R"
+
 echo "== M3 (T1059) : shell interactif dans le conteneur (priorité Notice -> validation humaine)"
 T=$(now); shell; sleep 8
 NAME=$(curl -s "$API/events" | python3 -c \
@@ -72,6 +96,12 @@ fi
 if shell; then R=false; else R=true; fi
 log M3 malicious shell_execution "$T" "$R"
 echo "   rejeu bloqué : $R"
+
+echo "== B4 (légitime) : le service web répond toujours après toutes les politiques"
+T=$(now); run -- curl -s -m 5 -o /dev/null http://web.demo.svc.cluster.local; sleep 5
+if run -- curl -sf -m 5 -o /dev/null http://web.demo.svc.cluster.local && run -- nginx -t; then R=false; else R=true; fi
+log B4 benign none "$T" "$R"
+echo "   service toujours fonctionnel : $([ "$R" = false ] && echo oui || echo NON)"
 
 curl -s "$API/events" > results/events.json
 curl -s "$API/metrics" > results/metrics.txt

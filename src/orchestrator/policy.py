@@ -12,6 +12,9 @@ import time
 from .classifier import ThreatEvent
 
 SEVERITY = {"Emergency": 10, "Alert": 9, "Critical": 8, "Error": 6, "Warning": 5}
+SA_TOKEN_DIRS = ["/run/secrets/kubernetes.io/serviceaccount/", "/var/run/secrets/kubernetes.io/serviceaccount/"]
+TMP_DIRS = ["/tmp/", "/dev/shm/", "/var/tmp/"]
+BIN_DIRS = ["/bin/", "/sbin/", "/usr/bin/", "/usr/sbin/", "/usr/local/bin/"]
 SHELL_PATHS = ["/bin/sh", "/bin/bash", "/bin/dash", "/usr/bin/sh", "/usr/bin/bash", "/usr/bin/dash"]
 
 # Labels ajoutés par Kubernetes / les contrôleurs, inutiles pour cibler un pod.
@@ -88,6 +91,15 @@ def build_policy(event: ThreatEvent, pod_labels: dict[str, str], block: bool,
         spec["process"] = {"matchPaths": [{"path": p} for p in paths]}
     elif event.threat_type == "sensitive_file_access":
         spec["file"] = {"matchPaths": [{"path": event.file_path or "/etc/shadow"}]}
+    elif event.threat_type == "token_theft":
+        spec["file"] = {"matchDirectories": [{"dir": d, "recursive": True} for d in SA_TOKEN_DIRS]}
+    elif event.threat_type == "untrusted_binary":
+        # Exécution interdite depuis les répertoires temporaires ; l'écriture y reste permise.
+        spec["process"] = {"matchDirectories": [{"dir": d, "recursive": True} for d in TMP_DIRS]}
+    elif event.threat_type == "binary_tampering":
+        # Lecture seule : les binaires restent exécutables mais ne peuvent plus être modifiés.
+        spec["file"] = {"matchDirectories": [{"dir": d, "recursive": True, "readOnly": True}
+                                             for d in BIN_DIRS]}
     elif event.threat_type == "privilege_escalation" and event.exe_path.startswith("/"):
         spec["process"] = {"matchPaths": [{"path": event.exe_path}]}
     else:

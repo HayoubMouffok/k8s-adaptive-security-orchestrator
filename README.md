@@ -58,7 +58,20 @@ Le script vérifie d'abord qu'AppArmor ou BPF-LSM est actif : sans eux, KubeArmo
 | M1 | attaque (T1003.008) | `cat /etc/shadow` | blocage immédiat, rejeu refusé |
 | M2 | attaque (T1071) | connexion vers le C2 de laboratoire | NetworkPolicy, rejeu coupé |
 | B2 | légitime | appel HTTP interne | trafic toujours autorisé |
+| M4 | attaque (T1528) | lecture du jeton du compte de service | répertoire du jeton interdit en lecture |
+| B3 | légitime | écriture d'un cache dans `/tmp` | toujours autorisée |
+| M5 | attaque (T1105) | exécution d'un outil déposé dans `/tmp` | exécution interdite depuis `/tmp`, `/dev/shm`, `/var/tmp` |
+| M6 | attaque (T1554) | écriture dans `/usr/bin` | répertoires de binaires en lecture seule |
 | M3 | attaque (T1059) | shell dans le conteneur | audit, validation humaine, puis blocage |
+| B4 | légitime | service web après toutes les politiques | toujours fonctionnel |
+
+## Supervision (Prometheus + Grafana)
+
+```bash
+./deploy/monitoring.sh   # Grafana sur le port 30300 du nœud, tableau de bord chargé automatiquement
+```
+
+Le tableau de bord affiche les alertes par type de menace, les politiques appliquées (blocage ou audit), les validations en attente, la latence médiane détection → blocage, les faux positifs et les audits expirés.
 
 ## Résultats
 
