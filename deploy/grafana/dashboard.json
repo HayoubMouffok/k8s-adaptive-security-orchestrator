@@ -4,7 +4,7 @@
  "timezone": "browser",
  "refresh": "5s",
  "time": {
-  "from": "now-30m",
+  "from": "now-10m",
   "to": "now"
  },
  "schemaVersion": 39,

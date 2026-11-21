@@ -73,6 +73,8 @@ Le script vérifie d'abord qu'AppArmor ou BPF-LSM est actif : sans eux, KubeArmo
 
 Le tableau de bord affiche les alertes par type de menace, les politiques appliquées (blocage ou audit), les validations en attente, la latence médiane détection → blocage, les faux positifs et les audits expirés.
 
+![Indicateurs Grafana après les 10 scénarios](docs/img/grafana-kpi.png)
+
 ## Résultats
 
 ### Mémoire (v1, Minikube)
