@@ -26,7 +26,7 @@ jobs:
           curl -sSL https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz | tar xz
           ./kubeconform -strict -summary deploy/orchestrator.yaml deploy/demo-app.yaml deploy/monitoring.yaml
       - name: ShellCheck
-        run: shellcheck deploy/install.sh deploy/monitoring.sh attacks/run_scenarios.sh
+        run: shellcheck deploy/install.sh deploy/monitoring.sh attacks/run_scenarios.sh attacks/demo.sh
 
   image:
     runs-on: ubuntu-latest
