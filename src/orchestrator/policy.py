@@ -120,12 +120,14 @@ def build_exec_guard(event: ThreatEvent, pod_labels: dict[str, str]) -> dict | N
     premier binaire d'un exec (la transition de profil a lieu à cet exec), cette règle comble ce trou."""
     if event.threat_type != "shell_execution":
         return None
-    selector = _selector_labels(pod_labels)
+    _selector_labels(pod_labels)  # même contrôle que pour les autres politiques
     meta = _metadata(event, "block", 0)
     meta["name"] = meta["name"].replace("auto-shell-execution", "auto-deny-exec")
-    targeted = " && ".join(
-        f"variables.pod.metadata.?labels[{json.dumps(k)}].orValue('') == {json.dumps(v)}"
-        for k, v in sorted(selector.items()))
+    # Cible : les pods du même ReplicaSet que le pod compromis (web-55dc86d74d-xxxxx -> web-55dc86d74d-).
+    # Une requête exec ne porte que le nom du pod ; s'en servir évite une lecture de l'API depuis CEL.
+    prefix = event.pod.rsplit("-", 1)[0] + "-" if event.pod.count("-") >= 2 else event.pod
+    targeted = (f"request.name.startsWith({json.dumps(prefix)})" if prefix.endswith("-")
+                else f"request.name == {json.dumps(prefix)}")
     return {
         "apiVersion": "policies.kyverno.io/v1",
         "kind": "NamespacedValidatingPolicy",
@@ -135,8 +137,6 @@ def build_exec_guard(event: ThreatEvent, pod_labels: dict[str, str]) -> dict | N
             "matchConstraints": {"resourceRules": [{
                 "apiGroups": [""], "apiVersions": ["v1"],
                 "operations": ["CONNECT"], "resources": ["pods/exec"]}]},
-            "variables": [{"name": "pod",
-                           "expression": 'resource.Get("v1", "pods", request.namespace, request.name)'}],
             "validations": [{
                 "expression": f"!({targeted})",
                 "message": f"{event.mitre_id} : exec interdit sur ce pod après détection d'un shell "

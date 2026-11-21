@@ -167,4 +167,4 @@ def test_blocked_shell_also_denies_kubectl_exec_with_kyverno():
     assert spec["matchConstraints"]["resourceRules"][0]["resources"] == ["pods/exec"]
     assert spec["matchConstraints"]["resourceRules"][0]["operations"] == ["CONNECT"]
     assert spec["validations"][0]["expression"] == (
-        """!(variables.pod.metadata.?labels["app"].orValue('') == "web")""")
+        """!(request.name.startsWith("web-7d9f-"))""")
