@@ -20,6 +20,8 @@ if ! command -v k3s >/dev/null; then
   curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--write-kubeconfig-mode 644" sh -
 fi
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+# Le nœud met quelques secondes à s'enregistrer : on attend qu'il existe avant d'attendre qu'il soit prêt.
+until kubectl get nodes 2>/dev/null | grep -q .; do sleep 3; done
 kubectl wait --for=condition=Ready node --all --timeout=180s
 
 echo "== 3/6 Helm"
@@ -33,11 +35,15 @@ kubectl apply -f https://raw.githubusercontent.com/kubearmor/KubeArmor/main/pkg/
 kubectl -n kubearmor rollout status ds -l kubearmor-app=kubearmor --timeout=300s || true
 
 echo "== 5/6 Orchestrateur + application de démo"
-command -v docker >/dev/null || { apt-get update -qq && apt-get install -y -qq docker.io; }
-docker build -t security-orchestrator:2.0.0 .
-docker save security-orchestrator:2.0.0 | k3s ctr images import -
+# Pas de Docker : installer Docker ajoute un second containerd qui perturbe la détection de
+# KubeArmor. Le code est livré au pod via une ConfigMap, les dépendances sont installées
+# par un initContainer au démarrage.
 kubectl apply -f deploy/orchestrator.yaml -f deploy/demo-app.yaml
-kubectl -n security-orchestrator rollout status deploy/orchestrator --timeout=120s
+kubectl -n security-orchestrator create configmap orchestrator-code \
+  --from-file=src/orchestrator/ --from-file=requirements.txt \
+  --dry-run=client -o yaml | kubectl apply -f -
+kubectl -n security-orchestrator rollout restart deploy/orchestrator
+kubectl -n security-orchestrator rollout status deploy/orchestrator --timeout=300s
 kubectl -n demo rollout status deploy/web --timeout=120s
 
 echo "== 6/6 Falco + Falcosidekick (webhook vers l'orchestrateur)"

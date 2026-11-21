@@ -52,12 +52,36 @@ spec:
       labels: {app: orchestrator}
     spec:
       serviceAccountName: orchestrator
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+      initContainers:
+        # Installe les dépendances Python dans un volume partagé (pas d'image à construire).
+        - name: deps
+          image: python:3.12-slim
+          command: ["pip", "install", "--no-cache-dir", "--retries", "10", "--timeout", "60",
+                    "--target", "/deps", "-r", "/app/orchestrator/requirements.txt"]
+          env:
+            - {name: HOME, value: /tmp}
+          volumeMounts:
+            - {name: deps, mountPath: /deps}
+            - {name: code, mountPath: /app/orchestrator}
+            - {name: tmp, mountPath: /tmp}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
       containers:
         - name: orchestrator
-          image: security-orchestrator:2.0.0
-          imagePullPolicy: Never
+          image: python:3.12-slim
+          command: ["python", "-m", "orchestrator.app"]
+          workingDir: /app
           ports: [{containerPort: 8080}]
           env:
+            - {name: PYTHONPATH, value: "/deps:/app"}
+            - {name: PYTHONDONTWRITEBYTECODE, value: "1"}
+            - {name: PYTHONUNBUFFERED, value: "1"}
             - {name: WATCHED_NAMESPACES, value: "demo"}
             # Warning et plus : blocage immédiat. Notice : audit + validation humaine.
             - {name: AUTO_BLOCK_PRIORITIES, value: "Emergency,Alert,Critical,Error,Warning"}
@@ -68,11 +92,19 @@ spec:
           resources:
             requests: {cpu: 50m, memory: 64Mi}
             limits: {cpu: 500m, memory: 256Mi}
+          volumeMounts:
+            - {name: deps, mountPath: /deps}
+            - {name: code, mountPath: /app/orchestrator}
           securityContext:
-            runAsNonRoot: true
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             capabilities: {drop: ["ALL"]}
+      volumes:
+        - {name: deps, emptyDir: {}}
+        - {name: tmp, emptyDir: {}}
+        - name: code
+          configMap:
+            name: orchestrator-code
 ---
 apiVersion: v1
 kind: Service
