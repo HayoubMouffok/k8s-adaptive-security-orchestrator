@@ -102,7 +102,7 @@ Mesuré le 21/11/2026 sur k3s (VM Ubuntu 24.04, 2 vCPU), Falco modern_ebpf, Kube
 
 Rapport détaillé régénéré à chaque exécution dans `attacks/results/report.md`.
 
-**Défense en profondeur pour les shells** : AppArmor ne contrôle pas le premier binaire lancé par un `kubectl exec` (la transition vers le profil KubeArmor a lieu à cet exec). Un shell lancé directement par `kubectl exec -- sh` échapperait donc à KubeArmor. Quand un shell est confirmé malveillant, l'orchestrateur pose aussi une `Policy` Kyverno qui refuse tout `kubectl exec` vers le pod, au niveau de l'API Kubernetes. Le shell lancé depuis le conteneur est bloqué par le noyau, le `kubectl exec` direct par l'API.
+**Défense en profondeur pour les shells** : AppArmor ne contrôle pas le premier binaire lancé par un `kubectl exec` (la transition vers le profil KubeArmor a lieu à cet exec). Un shell lancé directement par `kubectl exec -- sh` échapperait donc à KubeArmor. Quand un shell est confirmé malveillant, l'orchestrateur pose aussi une `NamespacedValidatingPolicy` Kyverno (règle CEL) qui refuse tout `kubectl exec` vers le pod, au niveau de l'API Kubernetes. Le shell lancé depuis le conteneur est bloqué par le noyau, le `kubectl exec` direct par l'API.
 
 ## API de l'orchestrateur
 

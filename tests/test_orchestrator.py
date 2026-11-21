@@ -107,7 +107,7 @@ def make(cfg=None):
 def test_critical_alert_is_blocked_immediately():
     c, kube = make()
     r = c.post("/falco", json=alert("Terminal shell in container", **{"proc.name": "bash"})).get_json()
-    assert r["action"] == "block" and [m["kind"] for m in kube.applied] == ["KubeArmorPolicy", "Policy"]
+    assert r["action"] == "block" and [m["kind"] for m in kube.applied] == ["KubeArmorPolicy", "NamespacedValidatingPolicy"]
     assert r["latency_s"] < 5
 
 
@@ -159,11 +159,11 @@ def test_blocked_shell_also_denies_kubectl_exec_with_kyverno():
     c, kube = make()
     r = c.post("/falco", json=alert("Terminal shell in container", "Notice",
                                     **{"proc.name": "sh"})).get_json()
-    assert r["action"] == "audit" and not any(m["kind"] == "Policy" for m in kube.applied)
+    assert r["action"] == "audit" and not any(m["kind"] == "NamespacedValidatingPolicy" for m in kube.applied)
     c.post(f"/approve/demo/{r['policy']}")
-    guard = [m for m in kube.applied if m["kind"] == "Policy"][-1]
-    rule = guard["spec"]["rules"][0]
-    assert rule["match"]["any"][0]["resources"]["kinds"] == ["Pod/exec"]
-    assert rule["validate"]["failureAction"] == "Enforce"
-    assert rule["validate"]["deny"]["conditions"]["all"] == [
-        {"key": "{{ podlabels.\"app\" || '' }}", "operator": "Equals", "value": "web"}]
+    guard = [m for m in kube.applied if m["kind"] == "NamespacedValidatingPolicy"][-1]
+    spec = guard["spec"]
+    assert spec["matchConstraints"]["resourceRules"][0]["resources"] == ["pods/exec"]
+    assert spec["matchConstraints"]["resourceRules"][0]["operations"] == ["CONNECT"]
+    assert spec["validations"][0]["expression"] == (
+        """!(variables.pod.metadata.?labels["app"].orValue('') == "web")""")

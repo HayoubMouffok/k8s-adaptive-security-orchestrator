@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import time
 
 from .classifier import ThreatEvent
@@ -114,36 +115,32 @@ def build_policy(event: ThreatEvent, pod_labels: dict[str, str], block: bool,
 
 
 def build_exec_guard(event: ThreatEvent, pod_labels: dict[str, str]) -> dict | None:
-    """Seconde couche pour les shells : une Policy Kyverno refuse tout « kubectl exec » vers les pods
-    visés, au niveau de l'API Kubernetes. AppArmor ne contrôle pas le premier binaire d'un exec
-    (la transition de profil a lieu à cet exec), cette règle comble ce trou."""
+    """Seconde couche pour les shells : une NamespacedValidatingPolicy Kyverno (CEL) refuse tout
+    « kubectl exec » vers les pods visés, au niveau de l'API Kubernetes. AppArmor ne contrôle pas le
+    premier binaire d'un exec (la transition de profil a lieu à cet exec), cette règle comble ce trou."""
     if event.threat_type != "shell_execution":
         return None
     selector = _selector_labels(pod_labels)
     meta = _metadata(event, "block", 0)
     meta["name"] = meta["name"].replace("auto-shell-execution", "auto-deny-exec")
-    conditions = [{"key": f"{{{{ podlabels.\"{k}\" || '' }}}}", "operator": "Equals", "value": v}
-                  for k, v in sorted(selector.items())]
+    targeted = " && ".join(
+        f"variables.pod.metadata.?labels[{json.dumps(k)}].orValue('') == {json.dumps(v)}"
+        for k, v in sorted(selector.items()))
     return {
-        "apiVersion": "kyverno.io/v1",
-        "kind": "Policy",
+        "apiVersion": "policies.kyverno.io/v1",
+        "kind": "NamespacedValidatingPolicy",
         "metadata": meta,
         "spec": {
-            "background": False,
-            "rules": [{
-                "name": "deny-exec",
-                "match": {"any": [{"resources": {"kinds": ["Pod/exec"]}}]},
-                "context": [{"name": "podlabels", "apiCall": {
-                    "urlPath": "/api/v1/namespaces/{{request.namespace}}/pods/{{request.name}}",
-                    "jmesPath": "metadata.labels"}}],
-                "preconditions": {"all": [{"key": "{{ request.operation || 'BACKGROUND' }}",
-                                           "operator": "Equals", "value": "CONNECT"}]},
-                "validate": {
-                    "failureAction": "Enforce",
-                    "message": f"{event.mitre_id} : exec interdit sur ce pod après détection d'un shell "
-                               f"({meta['annotations']['orchestrator/rule']})",
-                    "deny": {"conditions": {"all": conditions}},
-                },
+            "validationActions": ["Deny"],
+            "matchConstraints": {"resourceRules": [{
+                "apiGroups": [""], "apiVersions": ["v1"],
+                "operations": ["CONNECT"], "resources": ["pods/exec"]}]},
+            "variables": [{"name": "pod",
+                           "expression": 'resource.Get("v1", "pods", request.namespace, request.name)'}],
+            "validations": [{
+                "expression": f"!({targeted})",
+                "message": f"{event.mitre_id} : exec interdit sur ce pod après détection d'un shell "
+                           f"({meta['annotations']['orchestrator/rule']})",
             }],
         },
     }

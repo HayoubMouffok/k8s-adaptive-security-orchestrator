@@ -4,8 +4,9 @@ from __future__ import annotations
 import time
 
 KA_GROUP, KA_VERSION, KA_PLURAL = "security.kubearmor.com", "v1", "kubearmorpolicies"
-KY_GROUP, KY_VERSION, KY_PLURAL = "kyverno.io", "v1", "policies"
-CRD = {"KubeArmorPolicy": (KA_GROUP, KA_VERSION, KA_PLURAL), "Policy": (KY_GROUP, KY_VERSION, KY_PLURAL)}
+KY_GROUP, KY_VERSION, KY_PLURAL = "policies.kyverno.io", "v1", "namespacedvalidatingpolicies"
+CRD = {"KubeArmorPolicy": (KA_GROUP, KA_VERSION, KA_PLURAL),
+       "NamespacedValidatingPolicy": (KY_GROUP, KY_VERSION, KY_PLURAL)}
 MANAGED = "app.kubernetes.io/managed-by=security-orchestrator"
 
 
