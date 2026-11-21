@@ -73,7 +73,17 @@ Le script vérifie d'abord qu'AppArmor ou BPF-LSM est actif : sans eux, KubeArmo
 
 ### v2 (k3s)
 
-Les résultats de `./attacks/run_scenarios.sh` sont écrits dans `attacks/results/report.md` : taux de détection, faux positifs, taux de blocage et latence.
+Mesuré le 21/11/2026 sur k3s (VM Ubuntu 24.04, 2 vCPU), Falco modern_ebpf, KubeArmor avec AppArmor, 3 attaques et 2 actions légitimes :
+
+| Indicateur | v1 (mémoire) | v2 |
+|---|---|---|
+| Taux de détection | non mesuré | **100 %** (3/3) |
+| Faux positifs | non mesuré | **0 %** (0/2) |
+| Attaques rejouées bloquées | non garanti (audit) | **100 %** (3/3) |
+| Trafic légitime préservé | non mesuré | oui |
+| Latence détection → politique appliquée | ~0,9 s | **0,04 s** (médiane) |
+
+Rapport détaillé régénéré à chaque exécution dans `attacks/results/report.md`.
 
 **Limite observée** : AppArmor ne contrôle pas le premier binaire lancé par un `kubectl exec` (la transition vers le profil KubeArmor a lieu à cet exec). Un shell lancé directement par `kubectl exec -- sh` n'est donc pas bloqué, contrairement à un shell lancé depuis le conteneur, comme lors d'une RCE. Ce cas se traite par le RBAC (droit `pods/exec`), ce qui complète la réponse automatique.
 
