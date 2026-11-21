@@ -107,7 +107,8 @@ def make(cfg=None):
 def test_critical_alert_is_blocked_immediately():
     c, kube = make()
     r = c.post("/falco", json=alert("Terminal shell in container", **{"proc.name": "bash"})).get_json()
-    assert r["action"] == "block" and [m["kind"] for m in kube.applied] == ["KubeArmorPolicy", "NamespacedValidatingPolicy"]
+    kinds = [m["kind"] for m in kube.applied]
+    assert r["action"] == "block" and kinds == ["KubeArmorPolicy", "NamespacedValidatingPolicy"]
     assert r["latency_s"] < 5
 
 
