@@ -18,10 +18,13 @@ kubectl -n "$NS" delete kubearmorpolicies,networkpolicies \
   -l app.kubernetes.io/managed-by=security-orchestrator --ignore-not-found >/dev/null
 sleep 5
 
+pkill -f "port-forward svc/orchestrator 18080" 2>/dev/null  # ancien tunnel éventuellement resté ouvert
+kubectl -n security-orchestrator rollout status deploy/orchestrator --timeout=120s >/dev/null
 kubectl -n security-orchestrator port-forward svc/orchestrator 18080:8080 >/dev/null 2>&1 &
 PF=$!
 trap 'kill $PF 2>/dev/null' EXIT
-sleep 3
+for _ in $(seq 30); do curl -sf "$API/healthz" >/dev/null && break; sleep 1; done
+curl -sf "$API/healthz" >/dev/null || { echo "API de l'orchestrateur injoignable"; exit 1; }
 
 log() {  # id, label (malicious|benign), type attendu, résultat du 2e essai
   printf '{"id":"%s","label":"%s","expected":"%s","start":"%s","replay_blocked":%s}\n' \
@@ -31,7 +34,10 @@ now() { date -u +%Y-%m-%dT%H:%M:%S.%3NZ; }
 run() { kubectl -n "$NS" exec "$POD" "$@" >/dev/null 2>&1; }
 # Shell avec un vrai terminal (la règle Falco « Terminal shell in container » exige un TTY) :
 # « script » fournit un pseudo-terminal à kubectl exec -it, même lancé depuis un script.
-shell() { script -qec "kubectl -n $NS exec -it $POD -- sh -c 'id'" /dev/null </dev/null >/dev/null 2>&1; }
+# Le shell est lancé par un processus du conteneur (env), comme lors d'une RCE : AppArmor ne contrôle
+# pas le tout premier binaire d'un « kubectl exec » (la transition de profil a lieu à cet exec),
+# ce cas-là relève du RBAC sur pods/exec (voir README, limites).
+shell() { script -qec "kubectl -n $NS exec -it $POD -- env sh -c 'id'" /dev/null </dev/null >/dev/null 2>&1; }
 
 echo "== B1 (légitime) : lecture de la configuration nginx"
 T=$(now); run -- nginx -t; run -- ls /usr/share/nginx/html; sleep 5

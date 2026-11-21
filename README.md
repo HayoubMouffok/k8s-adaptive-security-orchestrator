@@ -75,6 +75,8 @@ Le script vérifie d'abord qu'AppArmor ou BPF-LSM est actif : sans eux, KubeArmo
 
 Les résultats de `./attacks/run_scenarios.sh` sont écrits dans `attacks/results/report.md` : taux de détection, faux positifs, taux de blocage et latence.
 
+**Limite observée** : AppArmor ne contrôle pas le premier binaire lancé par un `kubectl exec` (la transition vers le profil KubeArmor a lieu à cet exec). Un shell lancé directement par `kubectl exec -- sh` n'est donc pas bloqué, contrairement à un shell lancé depuis le conteneur, comme lors d'une RCE. Ce cas se traite par le RBAC (droit `pods/exec`), ce qui complète la réponse automatique.
+
 ## API de l'orchestrateur
 
 | Méthode | Route | Rôle |
