@@ -107,7 +107,7 @@ def make(cfg=None):
 def test_critical_alert_is_blocked_immediately():
     c, kube = make()
     r = c.post("/falco", json=alert("Terminal shell in container", **{"proc.name": "bash"})).get_json()
-    assert r["action"] == "block" and len(kube.applied) == 1
+    assert r["action"] == "block" and [m["kind"] for m in kube.applied] == ["KubeArmorPolicy", "Policy"]
     assert r["latency_s"] < 5
 
 
@@ -153,3 +153,17 @@ def test_new_threat_types_build_directory_policies(rule, fields, expected, kind)
     assert ev.threat_type == expected
     pol = build_policy(ev, {"app": "web"}, block=True, ttl=0)
     assert pol["spec"]["action"] == "Block" and pol["spec"][kind]["matchDirectories"]
+
+
+def test_blocked_shell_also_denies_kubectl_exec_with_kyverno():
+    c, kube = make()
+    r = c.post("/falco", json=alert("Terminal shell in container", "Notice",
+                                    **{"proc.name": "sh"})).get_json()
+    assert r["action"] == "audit" and not any(m["kind"] == "Policy" for m in kube.applied)
+    c.post(f"/approve/demo/{r['policy']}")
+    guard = [m for m in kube.applied if m["kind"] == "Policy"][-1]
+    rule = guard["spec"]["rules"][0]
+    assert rule["match"]["any"][0]["resources"]["kinds"] == ["Pod/exec"]
+    assert rule["validate"]["failureAction"] == "Enforce"
+    assert rule["validate"]["deny"]["conditions"]["all"] == [
+        {"key": "{{ podlabels.\"app\" || '' }}", "operator": "Equals", "value": "web"}]

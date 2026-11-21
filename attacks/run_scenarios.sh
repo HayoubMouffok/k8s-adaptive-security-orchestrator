@@ -14,7 +14,7 @@ NS=demo
 API=http://127.0.0.1:18080
 
 echo "== Préparation : suppression des politiques créées lors des essais précédents"
-kubectl -n "$NS" delete kubearmorpolicies,networkpolicies \
+kubectl -n "$NS" delete kubearmorpolicies,networkpolicies,policies.kyverno.io \
   -l app.kubernetes.io/managed-by=security-orchestrator --ignore-not-found >/dev/null
 sleep 5
 
@@ -93,13 +93,19 @@ if [ -n "$NAME" ]; then
   echo "   politique en audit : $NAME -> validation humaine simulée"
   curl -s -X POST "$API/approve/$NS/$NAME" >/dev/null; sleep 10
 fi
-if shell; then R=false; else R=true; fi
+# Rejeu : shell lancé depuis le conteneur (AppArmor) ET « kubectl exec -- sh » direct (Kyverno)
+direct() { script -qec "kubectl -n $NS exec -it $POD -- sh -c 'id'" /dev/null </dev/null >/dev/null 2>&1; }
+if shell || direct; then R=false; else R=true; fi
 log M3 malicious shell_execution "$T" "$R"
 echo "   rejeu bloqué : $R"
 
 echo "== B4 (légitime) : le service web répond toujours après toutes les politiques"
-T=$(now); run -- curl -s -m 5 -o /dev/null http://web.demo.svc.cluster.local; sleep 5
-if run -- curl -sf -m 5 -o /dev/null http://web.demo.svc.cluster.local && run -- nginx -t; then R=false; else R=true; fi
+# (via le Service, depuis l'extérieur du pod : les exec vers ce pod sont désormais refusés par Kyverno)
+kubectl -n "$NS" port-forward svc/web 18081:80 >/dev/null 2>&1 &
+PFW=$!; sleep 3
+T=$(now); curl -s -m 5 -o /dev/null http://127.0.0.1:18081; sleep 5
+if curl -sf -m 5 -o /dev/null http://127.0.0.1:18081; then R=false; else R=true; fi
+kill $PFW 2>/dev/null
 log B4 benign none "$T" "$R"
 echo "   service toujours fonctionnel : $([ "$R" = false ] && echo oui || echo NON)"
 

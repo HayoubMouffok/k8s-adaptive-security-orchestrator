@@ -111,3 +111,39 @@ def build_policy(event: ThreatEvent, pod_labels: dict[str, str], block: bool,
         "metadata": meta,
         "spec": spec,
     }
+
+
+def build_exec_guard(event: ThreatEvent, pod_labels: dict[str, str]) -> dict | None:
+    """Seconde couche pour les shells : une Policy Kyverno refuse tout « kubectl exec » vers les pods
+    visés, au niveau de l'API Kubernetes. AppArmor ne contrôle pas le premier binaire d'un exec
+    (la transition de profil a lieu à cet exec), cette règle comble ce trou."""
+    if event.threat_type != "shell_execution":
+        return None
+    selector = _selector_labels(pod_labels)
+    meta = _metadata(event, "block", 0)
+    meta["name"] = meta["name"].replace("auto-shell-execution", "auto-deny-exec")
+    conditions = [{"key": f"{{{{ podlabels.\"{k}\" || '' }}}}", "operator": "Equals", "value": v}
+                  for k, v in sorted(selector.items())]
+    return {
+        "apiVersion": "kyverno.io/v1",
+        "kind": "Policy",
+        "metadata": meta,
+        "spec": {
+            "background": False,
+            "rules": [{
+                "name": "deny-exec",
+                "match": {"any": [{"resources": {"kinds": ["Pod/exec"]}}]},
+                "context": [{"name": "podlabels", "apiCall": {
+                    "urlPath": "/api/v1/namespaces/{{request.namespace}}/pods/{{request.name}}",
+                    "jmesPath": "metadata.labels"}}],
+                "preconditions": {"all": [{"key": "{{ request.operation || 'BACKGROUND' }}",
+                                           "operator": "Equals", "value": "CONNECT"}]},
+                "validate": {
+                    "failureAction": "Enforce",
+                    "message": f"{event.mitre_id} : exec interdit sur ce pod après détection d'un shell "
+                               f"({meta['annotations']['orchestrator/rule']})",
+                    "deny": {"conditions": {"all": conditions}},
+                },
+            }],
+        },
+    }

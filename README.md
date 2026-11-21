@@ -64,7 +64,7 @@ Le script vérifie d'abord qu'AppArmor ou BPF-LSM est actif : sans eux, KubeArmo
 | B3 | légitime | écriture d'un cache dans `/tmp` | toujours autorisée |
 | M5 | attaque (T1105) | exécution d'un outil déposé dans `/tmp` | exécution interdite depuis `/tmp`, `/dev/shm`, `/var/tmp` |
 | M6 | attaque (T1554) | écriture dans `/usr/bin` | répertoires de binaires en lecture seule |
-| M3 | attaque (T1059) | shell dans le conteneur | audit, validation humaine, puis blocage |
+| M3 | attaque (T1059) | shell dans le conteneur | audit, validation humaine, puis blocage (KubeArmor + Kyverno) |
 | B4 | légitime | service web après toutes les politiques | toujours fonctionnel |
 
 ## Supervision (Prometheus + Grafana)
@@ -102,7 +102,7 @@ Mesuré le 21/11/2026 sur k3s (VM Ubuntu 24.04, 2 vCPU), Falco modern_ebpf, Kube
 
 Rapport détaillé régénéré à chaque exécution dans `attacks/results/report.md`.
 
-**Limite observée** : AppArmor ne contrôle pas le premier binaire lancé par un `kubectl exec` (la transition vers le profil KubeArmor a lieu à cet exec). Un shell lancé directement par `kubectl exec -- sh` n'est donc pas bloqué, contrairement à un shell lancé depuis le conteneur, comme lors d'une RCE. Ce cas se traite par le RBAC (droit `pods/exec`), ce qui complète la réponse automatique.
+**Défense en profondeur pour les shells** : AppArmor ne contrôle pas le premier binaire lancé par un `kubectl exec` (la transition vers le profil KubeArmor a lieu à cet exec). Un shell lancé directement par `kubectl exec -- sh` échapperait donc à KubeArmor. Quand un shell est confirmé malveillant, l'orchestrateur pose aussi une `Policy` Kyverno qui refuse tout `kubectl exec` vers le pod, au niveau de l'API Kubernetes. Le shell lancé depuis le conteneur est bloqué par le noyau, le `kubectl exec` direct par l'API.
 
 ## API de l'orchestrateur
 

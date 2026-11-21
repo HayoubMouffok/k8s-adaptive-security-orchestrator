@@ -22,7 +22,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, ge
 
 from .classifier import classify
 from .config import Config
-from .policy import build_policy
+from .policy import build_exec_guard, build_policy
 
 log = logging.getLogger("orchestrator")
 
@@ -102,6 +102,9 @@ def create_app(kube=None, cfg: Config | None = None, start_reaper: bool = True) 
             return jsonify(record), 200
 
         status = "dry-run" if cfg.dry_run else kube.apply(manifest)
+        guard = build_exec_guard(ev, labels) if block else None
+        if guard and not cfg.dry_run:
+            kube.apply(guard)
         latency = (datetime.now(timezone.utc) - ev.alert_time).total_seconds()
         LATENCY.observe(max(latency, 0))
         mode = "block" if block else "audit"
@@ -131,8 +134,11 @@ def create_app(kube=None, cfg: Config | None = None, start_reaper: bool = True) 
         if not item:
             return jsonify({"error": "aucune politique en attente"}), 404
         manifest = build_policy(item["event"], item["labels"], block=True, ttl=0)
-        if manifest and not cfg.dry_run:
-            kube.apply(manifest)
+        guard = build_exec_guard(item["event"], item["labels"])
+        if not cfg.dry_run:
+            for m in (manifest, guard):
+                if m:
+                    kube.apply(m)
         POLICIES.labels(manifest["kind"] if manifest else "none", "block").inc()
         return jsonify({"policy": name, "mode": "block"}), 200
 

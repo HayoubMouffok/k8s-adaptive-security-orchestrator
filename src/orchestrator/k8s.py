@@ -4,6 +4,8 @@ from __future__ import annotations
 import time
 
 KA_GROUP, KA_VERSION, KA_PLURAL = "security.kubearmor.com", "v1", "kubearmorpolicies"
+KY_GROUP, KY_VERSION, KY_PLURAL = "kyverno.io", "v1", "policies"
+CRD = {"KubeArmorPolicy": (KA_GROUP, KA_VERSION, KA_PLURAL), "Policy": (KY_GROUP, KY_VERSION, KY_PLURAL)}
 MANAGED = "app.kubernetes.io/managed-by=security-orchestrator"
 
 
@@ -28,24 +30,24 @@ class KubeClient:
         ns, name = manifest["metadata"]["namespace"], manifest["metadata"]["name"]
         kind = manifest["kind"]
         try:
-            if kind == "KubeArmorPolicy":
-                self.custom.create_namespaced_custom_object(KA_GROUP, KA_VERSION, ns, KA_PLURAL, manifest)
+            if kind in CRD:
+                self.custom.create_namespaced_custom_object(*CRD[kind][:2], ns, CRD[kind][2], manifest)
             else:
                 self.net.create_namespaced_network_policy(ns, manifest)
             return "created"
         except self._ApiException as e:
             if e.status != 409:
                 raise
-        if kind == "KubeArmorPolicy":
-            self.custom.patch_namespaced_custom_object(KA_GROUP, KA_VERSION, ns, KA_PLURAL, name, manifest)
+        if kind in CRD:
+            self.custom.patch_namespaced_custom_object(*CRD[kind][:2], ns, CRD[kind][2], name, manifest)
         else:
             self.net.patch_namespaced_network_policy(name, ns, manifest)
         return "updated"
 
     def delete(self, kind: str, namespace: str, name: str) -> None:
         try:
-            if kind == "KubeArmorPolicy":
-                self.custom.delete_namespaced_custom_object(KA_GROUP, KA_VERSION, namespace, KA_PLURAL, name)
+            if kind in CRD:
+                self.custom.delete_namespaced_custom_object(*CRD[kind][:2], namespace, CRD[kind][2], name)
             else:
                 self.net.delete_namespaced_network_policy(name, namespace)
         except self._ApiException as e:

@@ -34,6 +34,13 @@ helm upgrade --install kubearmor-operator kubearmor/kubearmor-operator -n kubear
 kubectl apply -f https://raw.githubusercontent.com/kubearmor/KubeArmor/main/pkg/KubeArmorOperator/config/samples/sample-config.yml
 kubectl -n kubearmor rollout status ds -l kubearmor-app=kubearmor --timeout=300s || true
 
+echo "== Kyverno (seconde couche : refuse les kubectl exec vers un pod compromis)"
+helm repo add kyverno https://kyverno.github.io/kyverno >/dev/null
+helm repo update >/dev/null
+helm upgrade --install kyverno kyverno/kyverno -n kyverno --create-namespace --wait --timeout 10m \
+  --set backgroundController.enabled=false --set cleanupController.enabled=false \
+  --set reportsController.enabled=false
+
 echo "== 5/6 Orchestrateur + application de démo"
 # Pas de Docker : installer Docker ajoute un second containerd qui perturbe la détection de
 # KubeArmor. Le code est livré au pod via une ConfigMap, les dépendances sont installées
