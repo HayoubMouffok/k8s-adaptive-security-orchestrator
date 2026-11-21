@@ -25,3 +25,16 @@ def test_metrics():
     assert r["block_rate"] == 0.5
     assert r["latency_median_s"] == 0.4
     assert "Taux de détection" in report(r)
+
+
+def test_alert_belongs_to_latest_scenario_only():
+    scen = [
+        {"id": "B1", "label": "benign", "expected": "none", "start": "2026-11-20T10:00:00.000Z",
+         "replay_blocked": None},
+        {"id": "M2", "label": "malicious", "expected": "network_activity",
+         "start": "2026-11-20T10:00:08.000Z", "replay_blocked": True},
+    ]
+    evts = [{"alert_time": "2026-11-20T10:00:10+00:00", "action": "block",
+             "threat_type": "network_activity", "latency_s": 0.07}]
+    r = evaluate(scen, evts)
+    assert r["false_positive_rate"] == 0.0 and r["detection_rate"] == 1.0

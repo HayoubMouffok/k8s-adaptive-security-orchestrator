@@ -9,7 +9,7 @@ import statistics
 import sys
 from datetime import datetime, timedelta
 
-WINDOW = timedelta(seconds=15)  # une alerte est rattachée au scénario qui a démarré juste avant
+WINDOW = timedelta(seconds=15)  # une alerte au-delà de ce délai n'est rattachée à aucun scénario
 
 
 def ts(s: str) -> datetime:
@@ -18,11 +18,20 @@ def ts(s: str) -> datetime:
 
 def evaluate(scenarios: list[dict], events: list[dict]) -> dict:
     acted = [e for e in events if e.get("action") in ("block", "audit")]
+    starts = sorted(ts(s["start"]) for s in scenarios)
+
+    def owner(alert_time: datetime) -> datetime | None:
+        """Chaque alerte est rattachée au DERNIER scénario lancé avant elle (et non à tous ceux
+        de la fenêtre), sinon l'alerte d'une attaque est aussi comptée sur l'action légitime
+        qui la précède."""
+        before = [st for st in starts if st <= alert_time <= st + WINDOW]
+        return before[-1] if before else None
+
     rows, latencies = [], []
     tp = fn = fp = tn = 0
     for s in scenarios:
         start = ts(s["start"])
-        hits = [e for e in acted if start <= ts(e["alert_time"]) <= start + WINDOW]
+        hits = [e for e in acted if owner(ts(e["alert_time"])) == start]
         if s["label"] == "malicious":
             match = [e for e in hits if e["threat_type"] == s["expected"]]
             if match:

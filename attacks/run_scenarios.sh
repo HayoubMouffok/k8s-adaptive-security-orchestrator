@@ -13,6 +13,11 @@ POD="deploy/web"
 NS=demo
 API=http://127.0.0.1:18080
 
+echo "== Préparation : suppression des politiques créées lors des essais précédents"
+kubectl -n "$NS" delete kubearmorpolicies,networkpolicies \
+  -l app.kubernetes.io/managed-by=security-orchestrator --ignore-not-found >/dev/null
+sleep 5
+
 kubectl -n security-orchestrator port-forward svc/orchestrator 18080:8080 >/dev/null 2>&1 &
 PF=$!
 trap 'kill $PF 2>/dev/null' EXIT
@@ -24,6 +29,9 @@ log() {  # id, label (malicious|benign), type attendu, résultat du 2e essai
 }
 now() { date -u +%Y-%m-%dT%H:%M:%S.%3NZ; }
 run() { kubectl -n "$NS" exec "$POD" "$@" >/dev/null 2>&1; }
+# Shell avec un vrai terminal (la règle Falco « Terminal shell in container » exige un TTY) :
+# « script » fournit un pseudo-terminal à kubectl exec -it, même lancé depuis un script.
+shell() { script -qec "kubectl -n $NS exec -it $POD -- sh -c 'id'" /dev/null </dev/null >/dev/null 2>&1; }
 
 echo "== B1 (légitime) : lecture de la configuration nginx"
 T=$(now); run -- nginx -t; run -- ls /usr/share/nginx/html; sleep 5
@@ -48,14 +56,14 @@ log B2 benign none "$T" "$R"
 echo "   trafic légitime toujours autorisé : $([ "$R" = false ] && echo oui || echo NON)"
 
 echo "== M3 (T1059) : shell interactif dans le conteneur (priorité Notice -> validation humaine)"
-T=$(now); run -t -- sh -c 'id'; sleep 8
+T=$(now); shell; sleep 8
 NAME=$(curl -s "$API/events" | python3 -c \
   "import json,sys;e=[x for x in json.load(sys.stdin) if x.get('threat_type')=='shell_execution' and x.get('action')=='audit'];print(e[-1]['policy'] if e else '')")
 if [ -n "$NAME" ]; then
   echo "   politique en audit : $NAME -> validation humaine simulée"
   curl -s -X POST "$API/approve/$NS/$NAME" >/dev/null; sleep 5
 fi
-if run -t -- sh -c 'id'; then R=false; else R=true; fi
+if shell; then R=false; else R=true; fi
 log M3 malicious shell_execution "$T" "$R"
 echo "   rejeu bloqué : $R"
 
