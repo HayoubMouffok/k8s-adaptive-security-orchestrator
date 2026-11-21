@@ -90,7 +90,7 @@ Le tableau de bord affiche les alertes par type de menace, les politiques appliq
 
 ### v2 (k3s)
 
-Mesuré le 21/11/2026 sur k3s (VM Ubuntu 24.04, 2 vCPU), Falco modern_ebpf, KubeArmor avec AppArmor, 6 attaques (6 techniques MITRE ATT&CK) et 4 actions légitimes :
+Mesuré le 21/11/2026 sur k3s (VM Ubuntu 24.04, 2 vCPU), Falco modern_ebpf, KubeArmor avec AppArmor, Kyverno 1.20, 6 attaques (6 techniques MITRE ATT&CK) et 4 actions légitimes :
 
 | Indicateur | v1 (mémoire) | v2 |
 |---|---|---|
@@ -98,7 +98,7 @@ Mesuré le 21/11/2026 sur k3s (VM Ubuntu 24.04, 2 vCPU), Falco modern_ebpf, Kube
 | Faux positifs | non mesuré | **0 %** (0/4) |
 | Attaques rejouées bloquées | non garanti (audit) | **100 %** (6/6) |
 | Actions légitimes préservées | non mesuré | **100 %** (3/3) |
-| Latence détection → politique appliquée | ~0,9 s | **0,03 s** (médiane, max 0,04 s) |
+| Latence détection → politique appliquée | ~0,9 s | **0,03 s** (médiane, max 0,06 s) |
 
 Rapport détaillé régénéré à chaque exécution dans `attacks/results/report.md`.
 
