@@ -61,7 +61,7 @@ NAME=$(curl -s "$API/events" | python3 -c \
   "import json,sys;e=[x for x in json.load(sys.stdin) if x.get('threat_type')=='shell_execution' and x.get('action')=='audit'];print(e[-1]['policy'] if e else '')")
 if [ -n "$NAME" ]; then
   echo "   politique en audit : $NAME -> validation humaine simulée"
-  curl -s -X POST "$API/approve/$NS/$NAME" >/dev/null; sleep 5
+  curl -s -X POST "$API/approve/$NS/$NAME" >/dev/null; sleep 10
 fi
 if shell; then R=false; else R=true; fi
 log M3 malicious shell_execution "$T" "$R"
