@@ -4,6 +4,8 @@ Détecte une attaque dans un cluster Kubernetes et **applique automatiquement un
 
 Projet issu de mon mémoire de **Master Réseaux et Objets Connectés (CNAM, 2025)**, puis prolongé (v2) pour lever ses limites : blocage réel, attaques rejouables, mesure des faux positifs, validation humaine et métriques.
 
+![Démo : attaque réussie, politique générée, attaque bloquée](docs/img/demo.gif)
+
 ## Architecture
 
 ```mermaid
