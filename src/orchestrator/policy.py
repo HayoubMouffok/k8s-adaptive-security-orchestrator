@@ -12,7 +12,7 @@ import time
 from .classifier import ThreatEvent
 
 SEVERITY = {"Emergency": 10, "Alert": 9, "Critical": 8, "Error": 6, "Warning": 5}
-SHELL_PATHS = ["/bin/sh", "/bin/bash", "/usr/bin/sh", "/usr/bin/bash", "/bin/dash"]
+SHELL_PATHS = ["/bin/sh", "/bin/bash", "/bin/dash", "/usr/bin/sh", "/usr/bin/bash", "/usr/bin/dash"]
 
 # Labels ajoutés par Kubernetes / les contrôleurs, inutiles pour cibler un pod.
 _IGNORED_LABELS = {"pod-template-hash", "controller-revision-hash", "pod-template-generation"}
