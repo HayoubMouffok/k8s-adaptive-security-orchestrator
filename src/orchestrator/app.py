@@ -47,6 +47,7 @@ def create_app(kube=None, cfg: Config | None = None, start_reaper: bool = True) 
     app = Flask(__name__)
     events: list[dict] = []
     pending: dict[str, dict] = {}  # "ns/name" -> {"event", "labels"}
+    approved: set[str] = set()  # politiques validées par un humain
     lock = threading.Lock()
 
     def notify(text: str) -> None:
@@ -88,6 +89,13 @@ def create_app(kube=None, cfg: Config | None = None, start_reaper: bool = True) 
             log.error("génération impossible : %s", e)
             return jsonify(record), 200
 
+        if manifest is not None and not block:
+            with lock:
+                already = f"{ev.namespace}/{manifest['metadata']['name']}" in approved
+            if already:  # validée par un humain : une nouvelle alerte ne doit pas la repasser en audit
+                block = True
+                manifest = build_policy(ev, labels, block=True, ttl=0)
+
         if manifest is None:
             record["reason"] = "pas de réponse automatique pour ce type"
             events.append(record)
@@ -118,6 +126,8 @@ def create_app(kube=None, cfg: Config | None = None, start_reaper: bool = True) 
         with lock:
             item = pending.pop(f"{ns}/{name}", None)
             PENDING.set(len(pending))
+            if item:
+                approved.add(f"{ns}/{name}")
         if not item:
             return jsonify({"error": "aucune politique en attente"}), 404
         manifest = build_policy(item["event"], item["labels"], block=True, ttl=0)

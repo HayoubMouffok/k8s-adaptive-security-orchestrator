@@ -119,6 +119,10 @@ def test_warning_alert_waits_for_human_then_approve():
     assert kube.applied[-1]["spec"]["action"] == "Audit"
     a = c.post(f"/approve/demo/{r['policy']}").get_json()
     assert a["mode"] == "block" and kube.applied[-1]["spec"]["action"] == "Block"
+    # une nouvelle alerte identique ne doit pas repasser la politique validée en audit
+    r2 = c.post("/falco", json=alert("Read sensitive file untrusted", "Warning",
+                                     **{"fd.name": "/etc/shadow"})).get_json()
+    assert r2["action"] == "block" and kube.applied[-1]["spec"]["action"] == "Block"
 
 
 def test_reject_counts_false_positive_and_deletes():
