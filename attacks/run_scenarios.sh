@@ -14,8 +14,10 @@ NS=demo
 API=http://127.0.0.1:18080
 
 echo "== Préparation : suppression des politiques créées lors des essais précédents"
-kubectl -n "$NS" delete kubearmorpolicies,networkpolicies,policies.kyverno.io \
-  -l app.kubernetes.io/managed-by=security-orchestrator --ignore-not-found >/dev/null
+for kind in kubearmorpolicies networkpolicies policies.kyverno.io; do  # Kyverno peut être absent
+  kubectl -n "$NS" delete "$kind" -l app.kubernetes.io/managed-by=security-orchestrator \
+    --ignore-not-found >/dev/null 2>&1 || true
+done
 sleep 5
 
 pkill -f "port-forward svc/orchestrator 18080" 2>/dev/null  # ancien tunnel éventuellement resté ouvert
