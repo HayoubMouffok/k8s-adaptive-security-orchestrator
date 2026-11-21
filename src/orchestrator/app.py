@@ -61,6 +61,14 @@ def create_app(kube=None, cfg: Config | None = None, start_reaper: bool = True) 
         except Exception as e:  # noqa: BLE001 - la notification ne doit jamais bloquer la réponse
             log.warning("notification échouée : %s", e)
 
+    def apply_guard(guard: dict) -> None:
+        """La garde Kyverno est une couche en plus : son échec ne doit pas annuler le blocage KubeArmor."""
+        try:
+            kube.apply(guard)
+        except Exception as e:  # noqa: BLE001 - Kyverno absent ou politique refusée
+            log.error("garde Kyverno non appliquée (%s) : %s", guard["metadata"]["name"],
+                      getattr(e, "body", None) or e)
+
     @app.post("/falco")
     def falco():
         alert = request.get_json(force=True, silent=True) or {}
@@ -104,7 +112,7 @@ def create_app(kube=None, cfg: Config | None = None, start_reaper: bool = True) 
         status = "dry-run" if cfg.dry_run else kube.apply(manifest)
         guard = build_exec_guard(ev, labels) if block else None
         if guard and not cfg.dry_run:
-            kube.apply(guard)
+            apply_guard(guard)
         latency = (datetime.now(timezone.utc) - ev.alert_time).total_seconds()
         LATENCY.observe(max(latency, 0))
         mode = "block" if block else "audit"
@@ -136,9 +144,10 @@ def create_app(kube=None, cfg: Config | None = None, start_reaper: bool = True) 
         manifest = build_policy(item["event"], item["labels"], block=True, ttl=0)
         guard = build_exec_guard(item["event"], item["labels"])
         if not cfg.dry_run:
-            for m in (manifest, guard):
-                if m:
-                    kube.apply(m)
+            if manifest:
+                kube.apply(manifest)
+            if guard:
+                apply_guard(guard)
         POLICIES.labels(manifest["kind"] if manifest else "none", "block").inc()
         return jsonify({"policy": name, "mode": "block"}), 200
 
