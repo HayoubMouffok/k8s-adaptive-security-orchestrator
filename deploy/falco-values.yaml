@@ -42,6 +42,7 @@ customRules:
       condition: >
         open_read and container
         and fd.name contains "/secrets/kubernetes.io/serviceaccount"
+        and not k8s.ns.name in (kube-system, kubearmor, falco, monitoring, security-orchestrator)
       output: >
         Jeton du compte de service lu (pod=%k8s.pod.name ns=%k8s.ns.name proc=%proc.name file=%fd.name)
       priority: WARNING

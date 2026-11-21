@@ -134,7 +134,7 @@
    "targets": [
     {
      "refId": "A",
-     "expr": "histogram_quantile(0.5, sum(rate(orchestrator_response_seconds_bucket[30m])) by (le))"
+     "expr": "1000 * histogram_quantile(0.5, sum(rate(orchestrator_response_seconds_bucket[30m])) by (le))"
     }
    ],
    "options": {
@@ -148,8 +148,8 @@
    },
    "fieldConfig": {
     "defaults": {
-     "unit": "s",
-     "decimals": 3
+     "unit": "ms",
+     "decimals": 0
     },
     "overrides": []
    }

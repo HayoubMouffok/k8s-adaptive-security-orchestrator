@@ -34,7 +34,7 @@ PENDING = Gauge("orchestrator_pending_approvals", "Politiques en attente de vali
 LATENCY = Histogram(
     "orchestrator_response_seconds",
     "Délai entre l'événement détecté par Falco et l'application de la politique",
-    buckets=(0.1, 0.25, 0.5, 1, 2, 5, 10, 30),
+    buckets=(0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 30),
 )
 
 
@@ -65,7 +65,6 @@ def create_app(kube=None, cfg: Config | None = None, start_reaper: bool = True) 
     def falco():
         alert = request.get_json(force=True, silent=True) or {}
         ev = classify(alert)
-        ALERTS.labels(ev.threat_type, ev.priority).inc()
         record = {
             "received_at": datetime.now(timezone.utc).isoformat(),
             "alert_time": ev.alert_time.isoformat(),
@@ -78,6 +77,7 @@ def create_app(kube=None, cfg: Config | None = None, start_reaper: bool = True) 
             record["reason"] = "namespace non surveillé"
             events.append(record)
             return jsonify(record), 200
+        ALERTS.labels(ev.threat_type, ev.priority).inc()  # seules les alertes des namespaces surveillés
 
         block = ev.priority in cfg.auto_block_priorities
         try:
